@@ -16,9 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 
+def temporary(request):
+    return JsonResponse({'message':'This is just temporary as I continue working'})
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('movies.urls')),
     path('', include('users.urls')),
+    path('', temporary),
 ]
