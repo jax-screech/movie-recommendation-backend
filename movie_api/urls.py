@@ -22,7 +22,7 @@ def temporary(request):
     return JsonResponse({'message':'This is just temporary as I continue working'})
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('movies.urls')),
-    path('', include('users.urls')),
+    path('api/', include('movies.urls')),
+    path('api/auth', include('users.urls')),
     path('', temporary),
 ]
