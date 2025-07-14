@@ -1,16 +1,21 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework import viewsets, filters
+from rest_framework.permissions import IsAuthenticated
 from .models import Movie, Like, Watchlist
 from .serializers import MovieSerializer, LikeSerializer, WatchlistSerializer
+from django_filters.rest_framework import DjangoFilterBackend
 
 # Create your views here.
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
-
-
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_fields = ['genre', 'rating']
+    search_fields = ['title', 'description']
+    ordering_fields = ['release_date', 'rating']
 class LikeViewSet(viewsets.ModelViewSet):
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
