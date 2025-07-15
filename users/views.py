@@ -1,18 +1,24 @@
-from rest_framework import generics
-from .models import CustomUser
-from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import CustomUser
+from .serializers import (
+    RegisterSerializer,
+    UserSerializer,
+    ChangePasswordSerializer,
+)
+
+
+# JWT Login (Custom Response)
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
-
-        # Add custom user info to the JSON Web token response
+        # Add extra user data to token response
         data['user'] = {
             "id": self.user.id,
             "username": self.user.username,
@@ -20,49 +26,76 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         }
         return data
 
-# Create your views here.
-class CustomTokenObtainPairView(TokenObtainPairView):# login using the custom serializer and return jwts and user information
-    serializer_class = CustomTokenObtainPairSerializer
-    permission_classes = [AllowAny]#no authentification is required to access it
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [AllowAny]
+
+
+# User Registration
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = RegisterSerializer
-    permission_classes = [AllowAny]#no authentication is required to register
-    
-    
+    permission_classes = [AllowAny]
+
+
+# Profile View / Update
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]#only authenticated users can access it
-    
-    #users get their information
-def get(self, request):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
-#update the username or email
-def put(self, request):
+
+    def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-class ChangePasswordView(APIView):
+
+
+# Change Password
+class ChangePasswordView(generics.UpdateAPIView):
+    serializer_class = ChangePasswordSerializer
+    model = CustomUser
     permission_classes = [IsAuthenticated]
 
-    def put(self, request):
-        serializer = ChangePasswordSerializer(data=request.data)
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(data=request.data)
 
         if serializer.is_valid():
-            user = request.user
-
-            # Check old password is correct
-            if not user.check_password(serializer.validated_data['old_password']):
-                return Response({'old_password': 'Incorrect password.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Set new password
-            user.set_password(serializer.validated_data['new_password'])
+            if not user.check_password(serializer.data.get("old_password")):
+                return Response({"old_password": ["Wrong password."]}, status=400)
+            user.set_password(serializer.data.get("new_password"))
             user.save()
+            return Response({"detail": "Password updated successfully."})
+        return Response(serializer.errors, status=400)
 
-            return Response({'detail': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# Delete Account
+class DeleteUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        user.delete()
+        return Response({"detail": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+
+# Logout
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"detail": "Logged out successfully."}, status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
