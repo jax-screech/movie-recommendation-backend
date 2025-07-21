@@ -1,34 +1,35 @@
-from rest_framework import viewsets, filters
-from rest_framework.permissions import IsAuthenticated
-from .models import Movie, Like, Watchlist
-from .serializers import MovieSerializer, LikeSerializer, WatchlistSerializer
-from django_filters.rest_framework import DjangoFilterBackend
+# movies/views.py
+import requests
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Movie
+from .serializers import MovieSerializer
+from django.conf import settings
 
-# Create your views here.
-class MovieViewSet(viewsets.ModelViewSet):
-    queryset = Movie.objects.all()
-    serializer_class = MovieSerializer
-    filter_backends = [
-        DjangoFilterBackend,
-        filters.SearchFilter,
-        filters.OrderingFilter,
-    ]
-    filterset_fields = ['genre', 'rating']
-    search_fields = ['title', 'description']
-    ordering_fields = ['release_date', 'rating']
-class LikeViewSet(viewsets.ModelViewSet):
-    queryset = Like.objects.all()
-    serializer_class = LikeSerializer
-    permission_classes = [IsAuthenticated]
+class TMDBFetchMoviesView(APIView):
+    def get(self, request):
+        api_key = settings.TMDB_API_KEY
+        url = f"https://api.themoviedb.org/3/movie/popular?api_key={api_key}&language=en-US&page=1"
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        response = requests.get(url)
+        if response.status_code != 200:
+            return Response({"error": "Failed to fetch movies from TMDB."}, status=status.HTTP_502_BAD_GATEWAY)
 
+        data = response.json().get('results', [])
+        movies = []
 
-class WatchlistViewSet(viewsets.ModelViewSet):
-    queryset = Watchlist.objects.all()
-    serializer_class = WatchlistSerializer
-    permission_classes = [IsAuthenticated]
+        for item in data:
+            movie, created = Movie.objects.get_or_create(
+                tmdb_id=item['id'],
+                defaults={
+                    'title': item.get('title'),
+                    'overview': item.get('overview'),
+                    'release_date': item.get('release_date'),
+                    'poster_path': item.get('poster_path'),
+                }
+            )
+            movies.append(movie)
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer = MovieSerializer(movies, many=True)
+        return Response(serializer.data)
