@@ -1,7 +1,7 @@
-# movies/urls.py
 from django.urls import path
-from .views import TMDBFetchMoviesView
+from .views import MovieListCreateView, MovieDetailView
 
 urlpatterns = [
-    path('fetch/', TMDBFetchMoviesView.as_view(), name='fetch-movies'),
+    path('', MovieListCreateView.as_view(), name='movie-list-create'),
+    path('<int:pk>/', MovieDetailView.as_view(), name='movie-detail'),
 ]

@@ -1,35 +1,16 @@
-# movies/views.py
-import requests
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import generics, permissions
 from .models import Movie
 from .serializers import MovieSerializer
-from django.conf import settings
 
-class TMDBFetchMoviesView(APIView):
-    def get(self, request):
-        api_key = settings.TMDB_API_KEY
-        url = f"https://api.themoviedb.org/3/movie/popular?api_key={api_key}&language=en-US&page=1"
+class MovieListCreateView(generics.ListCreateAPIView):
+    queryset = Movie.objects.all()
+    serializer_class = MovieSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-        response = requests.get(url)
-        if response.status_code != 200:
-            return Response({"error": "Failed to fetch movies from TMDB."}, status=status.HTTP_502_BAD_GATEWAY)
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
-        data = response.json().get('results', [])
-        movies = []
-
-        for item in data:
-            movie, created = Movie.objects.get_or_create(
-                tmdb_id=item['id'],
-                defaults={
-                    'title': item.get('title'),
-                    'overview': item.get('overview'),
-                    'release_date': item.get('release_date'),
-                    'poster_path': item.get('poster_path'),
-                }
-            )
-            movies.append(movie)
-
-        serializer = MovieSerializer(movies, many=True)
-        return Response(serializer.data)
+class MovieDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Movie.objects.all()
+    serializer_class = MovieSerializer
+    permission_classes = [permissions.IsAuthenticated]
