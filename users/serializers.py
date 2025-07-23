@@ -1,31 +1,41 @@
+# users/serializers.py
 from rest_framework import serializers
-from .models import CustomUser
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+
+User = get_user_model()
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = CustomUser
-        fields = ('username', 'email', 'password', 'password2')
-
-    def validate(self, data):
-        if data['password'] != data['password2']:
-            raise serializers.ValidationError("Passwords don't match.")
-        return data
+        model = User
+        fields = ('id', 'username', 'email', 'password', 'avatar')
 
     def create(self, validated_data):
-        validated_data.pop('password2')
-        return CustomUser.objects.create_user(**validated_data)
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password'],
+            avatar=validated_data.get('avatar')
+        )
+        return user
 
-class UserProfileSerializer(serializers.ModelSerializer):
+
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomUser
+        model = User
         fields = ('id', 'username', 'email', 'avatar')
 
-class UserProfileSerializer(serializers.ModelSerializer):
+
+class LoginResponseSerializer(serializers.ModelSerializer):
+    access = serializers.SerializerMethodField()
+
     class Meta:
-        model = CustomUser
-        fields = ['id', 'username', 'email', 'avatar']
+        model = User
+        fields = ('id', 'username', 'email', 'avatar', 'access')
+
+    def get_access(self, obj):
+        refresh = RefreshToken.for_user(obj)
+        return str(refresh.access_token)
 
