@@ -1,10 +1,10 @@
-# users/urls.py
 from django.urls import path
-from . import views
+from .views import RegisterView, LoginView, ProfileView, ForgotPasswordView, ResetPasswordView
 
 urlpatterns = [
-    path('register/', views.register_user, name='register'),
-    path('login/', views.login_user, name='login'),
-    path('profile/', views.get_profile, name='profile'),
-    path('forgot-password/', views.forgot_password, name='forgot-password'),
+    path('register/', RegisterView.as_view()),
+    path('login/', LoginView.as_view()),
+    path('profile/', ProfileView.as_view()),
+    path('forgot-password/', ForgotPasswordView.as_view()),
+    path('reset-password/<uidb64>/<token>/', ResetPasswordView.as_view()),
 ]

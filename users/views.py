@@ -1,72 +1,82 @@
-# users/views.py
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
-from django.utils.crypto import get_random_string
-from .serializers import RegisterSerializer, UserSerializer, LoginResponseSerializer
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
+from rest_framework import generics, status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 
 User = get_user_model()
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def register_user(request):
-    serializer = RegisterSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class ForgotPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                user = User.objects.get(email=email)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+
+                current_site = get_current_site(request)
+                reset_link = f"http://localhost:5173/forgot-password/"
+
+                subject = 'Password Reset Requested'
+                message = render_to_string('reset_password_email.html', {
+                    'user': user,
+                    'reset_link': reset_link,
+                })
+
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+                return Response({"message": "Password reset link sent to your email."})
+
+            except User.DoesNotExist:
+                return Response({"error": "User with this email does not exist."}, status=404)
+
+        return Response(serializer.errors, status=400)
+
+class ResetPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, uidb64, token):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                uid = force_str(urlsafe_base64_decode(uidb64))
+                user = User.objects.get(pk=uid)
+            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+                user = None
+
+            if user and default_token_generator.check_token(user, token):
+                user.set_password(serializer.validated_data['password'])
+                user.save()
+                return Response({"message": "Password reset successful."})
+            else:
+                return Response({"error": "Invalid or expired token."}, status=400)
+
+        return Response(serializer.errors, status=400)
 
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_user(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-    try:
-        user = User.objects.get(email=email)
-    except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=404)
+class RegisterView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
 
-    user = authenticate(request, username=user.username, password=password)
-    if user is not None:
-        data = LoginResponseSerializer(user).data
-        return Response(data, status=200)
-    else:
-        return Response({'error': 'Invalid credentials'}, status=401)
+class LoginView(APIView):
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data)
 
+class ProfileView(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_profile(request):
-    serializer = UserSerializer(request.user)
-    return Response(serializer.data)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def forgot_password(request):
-    email = request.data.get('email')
-    if not email:
-        return Response({'error': 'Email is required'}, status=400)
-
-    try:
-        user = User.objects.get(email=email)
-    except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=404)
-
-    token = get_random_string(length=32)
-    reset_link = f"http://127.0.0.1:8000/reset-password?token={token}"
-
-    send_mail(
-        subject="Reset Your Password",
-        message=f"Click the link to reset your password: {reset_link}",
-        from_email="admin@vitevue.com",
-        recipient_list=[email],
-        fail_silently=False,
-    )
-
-    return Response({'message': 'Password reset link sent to your email'})
+    def get_object(self):
+        return self.request.user
