@@ -27,7 +27,7 @@ class ForgotPasswordView(APIView):
                 token = default_token_generator.make_token(user)
 
                 current_site = get_current_site(request)
-                reset_link = f"http://localhost:5173/forgot-password/"
+                reset_link = f"http://localhost:5173/reset-password/{uid}/{token}/"
 
                 subject = 'Password Reset Requested'
                 message = render_to_string('reset_password_email.html', {
