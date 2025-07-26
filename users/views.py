@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 User = get_user_model()
 
@@ -68,15 +70,26 @@ class ResetPasswordView(APIView):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
+# views.py (optional for debugging)
 class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data)
+        if serializer.is_valid():
+            return Response(serializer.validated_data)
+        else:
+            print(serializer.errors)  # <- print the cause of the 400
+            return Response(serializer.errors, status=400)
 
-class ProfileView(generics.RetrieveAPIView):
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = UserSerializer
-
-    def get_object(self):
-        return self.request.user
+# views.py (DRF View)
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    user = request.user
+    if request.method == 'GET':
+        return Response(UserSerializer(user).data)
+    elif request.method == 'PUT':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

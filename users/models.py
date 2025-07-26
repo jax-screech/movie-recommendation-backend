@@ -4,9 +4,7 @@ from django.db import models
 def user_avatar_path(instance, filename):
     return f'avatars/user_{instance.id}/{filename}'
 
+# models.py
 class CustomUser(AbstractUser):
-    email = models.EmailField(unique=True)
-    avatar = models.ImageField(upload_to=user_avatar_path, blank=True, null=True)
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    address = models.CharField(max_length=255, blank=True)
