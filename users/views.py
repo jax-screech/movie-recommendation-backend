@@ -11,8 +11,12 @@ from rest_framework.views import APIView
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.contrib.auth import authenticate
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from dj_rest_auth.registration.views import SocialLoginView
 
 User = get_user_model()
 
@@ -80,9 +84,10 @@ class LoginView(APIView):
             print(serializer.errors)  # <- print the cause of the 400
             return Response(serializer.errors, status=400)
 
-# views.py (DRF View)
-@api_view(['GET', 'PUT'])
+# users/views.py
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def profile_view(request):
     user = request.user
     if request.method == 'GET':
@@ -93,3 +98,9 @@ def profile_view(request):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+    elif request.method == 'DELETE':
+        user.delete()
+        return Response({"message": "Account deleted successfully."}, status=204)
+
+class GoogleLogin(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
