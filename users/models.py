@@ -6,5 +6,9 @@ def user_avatar_path(instance, filename):
 
 # models.py
 class CustomUser(AbstractUser):
+    email = models.EmailField(unique=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     address = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return self.username

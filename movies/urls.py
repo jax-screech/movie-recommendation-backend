@@ -1,6 +1,11 @@
 from rest_framework.routers import DefaultRouter
-from .views import MovieViewSet
+from django.urls import path, include
+from .views import MovieViewSet, WatchProgressListCreateView
 
 router = DefaultRouter()
 router.register(r'movies', MovieViewSet, basename='movie')
-urlpatterns = router.urls
+
+urlpatterns = [
+    path('', include(router.urls)),
+    path('progress/', WatchProgressListCreateView.as_view(), name='watch-progress'),
+]

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Movie, Comment, Like
+from .models import Movie, Comment, Like, WatchProgress
 
 class CommentSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
@@ -15,3 +15,9 @@ class MovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Movie
         fields = '__all__'
+
+class WatchProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WatchProgress
+        fields = '__all__'
+        read_only_fields = ['user']

@@ -1,8 +1,8 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Movie, Comment, Like
-from .serializers import MovieSerializer, CommentSerializer
+from .models import Movie, Comment, Like, WatchProgress
+from .serializers import MovieSerializer, CommentSerializer, WatchProgressSerializer
 
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
@@ -29,3 +29,21 @@ class MovieViewSet(viewsets.ModelViewSet):
             serializer.save(user=request.user, movie=movie)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class WatchProgressListCreateView(generics.ListCreateAPIView):
+    serializer_class = WatchProgressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WatchProgress.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        movie_id = serializer.validated_data.get('movie_id')
+        progress = serializer.validated_data.get('progress')
+
+        existing = WatchProgress.objects.filter(user=self.request.user, movie_id=movie_id).first()
+        if existing:
+            existing.progress = progress
+            existing.save()
+        else:
+            serializer.save(user=self.request.user)

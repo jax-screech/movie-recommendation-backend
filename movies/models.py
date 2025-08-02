@@ -1,5 +1,7 @@
 from django.db import models
 from users.models import CustomUser
+from django.conf import settings
+from django.contrib.auth.models import User
 
 class Movie(models.Model):
     title = models.CharField(max_length=255)
@@ -21,3 +23,16 @@ class Like(models.Model):
 
     class Meta:
         unique_together = ('user', 'movie')
+
+
+class WatchProgress(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    movie_id = models.IntegerField()
+    movie_title = models.CharField(max_length=255)
+    poster_path = models.CharField(max_length=255, blank=True, null=True)
+    release_date = models.CharField(max_length=20, blank=True, null=True)
+    progress = models.IntegerField(default=0)
+    duration = models.IntegerField(default=600)
+
+    class Meta:
+        unique_together = ('user', 'movie_id')  # ✅ ensure 1 progress per movie
